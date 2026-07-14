@@ -9,6 +9,7 @@ from flask_cors import CORS
 from openai import OpenAI
 import io
 import csv
+import re
 
 app = Flask(__name__)
 CORS(app)
@@ -46,6 +47,64 @@ current_process = {
     "card_count": 0
 }
 
+def fix_broken_json(json_str, word):
+    """Versucht, ein kaputtes JSON zu reparieren."""
+    try:
+        # Entferne alle ... und andere Platzhalter
+        json_str = re.sub(r'\.\.\.', '', json_str)
+        
+        # Entferne Kommentare (falls vorhanden)
+        json_str = re.sub(r'//.*?$', '', json_str, flags=re.MULTILINE)
+        
+        # Entferne nachfolgende Kommas
+        json_str = re.sub(r',\s*}', '}', json_str)
+        json_str = re.sub(r',\s*\]', ']', json_str)
+        
+        return json.loads(json_str)
+    except:
+        # Wenn alles fehlschlägt, Fallback-Karte
+        return {
+            "sentence": f"**{word}** (Fehler bei der JSON-Parsing)",
+            "translation": "Fehler bei der Übersetzung",
+            "meaning": "Fehler bei der Bedeutung",
+            "etymology": "Fehler bei der Etymologie",
+            "inflection": "Fehler bei den Flexionen",
+            "notes": "Bitte manuell korrigieren"
+        }
+
+def parse_text_response(content, word):
+    """Parsed eine Text-Antwort, wenn kein JSON gefunden wurde."""
+    lines = content.strip().split('\n')
+    result = {
+        "sentence": f"**{word}** (Text konnte nicht geparst werden)",
+        "translation": "",
+        "meaning": "",
+        "etymology": "",
+        "inflection": "",
+        "notes": ""
+    }
+    
+    current_key = None
+    for line in lines:
+        line = line.strip()
+        if ':' in line:
+            key, value = line.split(':', 1)
+            key = key.strip().lower()
+            if 'satz' in key or 'sentence' in key:
+                result["sentence"] = value.strip()
+            elif 'übersetzung' in key or 'translation' in key:
+                result["translation"] = value.strip()
+            elif 'bedeutung' in key or 'meaning' in key:
+                result["meaning"] = value.strip()
+            elif 'etymologie' in key or 'etymology' in key:
+                result["etymology"] = value.strip()
+            elif 'flexion' in key or 'inflection' in key:
+                result["inflection"] = value.strip()
+            elif 'anmerkung' in key or 'notes' in key:
+                result["notes"] = value.strip()
+    
+    return result
+
 def extract_words_from_text(text, mode):
     """Extrahiert Vokabeln aus dem Quelltext."""
     if mode == "fluent":
@@ -56,57 +115,93 @@ def extract_words_from_text(text, mode):
         # Vokabelliste: jede nicht-leere Zeile ist eine Vokabel
         return [line.strip() for line in text.split('\n') if line.strip()]
 
-def generate_card_with_ai(word, context_sentence=None):
-    """Generiert eine Karteikarte mit GPT-4o-mini."""
-    if context_sentence:
-        prompt = f"""
-        Erstelle eine Anki-Karteikarte für die italienische Vokabel "{word}" im Kontext des Satzes:
-        "{context_sentence}"
+def generate_card_with_ai(word, context_sentence=None, client=None, model="gpt-4o-mini", temperature=0.7, max_tokens=500):
+    """Generiert eine Karteikarte mit KI, mit robustem Error-Handling."""
+    try:
+        # Prompt erstellen
+        if context_sentence:
+            prompt = f"""
+            Erstelle eine Anki-Karteikarte für die italienische Vokabel "{word}" im Kontext des Satzes:
+            "{context_sentence}"
 
-        Gib die Antwort im folgenden JSON-Format:
-        {{
-            "sentence": "Der vollständige Satz mit der fett markierten Vokabel (in ** doppelten Sternchen **)",
-            "translation": "Deutsche Übersetzung der Vokabel",
-            "meaning": "Bedeutung auf Italienisch (kurze Erklärung)",
-            "etymology": "Etymologie des Wortes (auf Italienisch, kurz)",
-            "inflection": "Flexionen (z.B. Konjugation oder Deklination, auf Italienisch)",
-            "notes": "Weitere Anmerkungen (auf Italienisch)"
-        }}
-        """
-    else:
-        prompt = f"""
-        Erstelle eine Anki-Karteikarte für die italienische Vokabel "{word}".
-        Erstelle auch einen Beispielsatz, der die Vokabel enthält.
+            Gib die Antwort im folgenden JSON-Format:
+            {{
+                "sentence": "Der vollständige Satz mit der fett markierten Vokabel (in ** doppelten Sternchen **)",
+                "translation": "Deutsche Übersetzung der Vokabel",
+                "meaning": "Bedeutung auf Italienisch (kurze Erklärung)",
+                "etymology": "Etymologie des Wortes (auf Italienisch, kurz)",
+                "inflection": "Flexionen (z.B. Konjugation oder Deklination, auf Italienisch)",
+                "notes": "Weitere Anmerkungen (auf Italienisch)"
+            }}
+            """
+        else:
+            prompt = f"""
+            Erstelle eine Anki-Karteikarte für die italienische Vokabel "{word}".
+            Erstelle auch einen Beispielsatz, der die Vokabel enthält.
 
-        Gib die Antwort im folgenden JSON-Format:
-        {{
-            "sentence": "Der Beispielsatz mit der fett markierten Vokabel (in ** doppelten Sternchen **)",
-            "translation": "Deutsche Übersetzung der Vokabel",
-            "meaning": "Bedeutung auf Italienisch (kurze Erklärung)",
-            "etymology": "Etymologie des Wortes (auf Italienisch, kurz)",
-            "inflection": "Flexionen (z.B. Konjugation oder Deklination, auf Italienisch)",
-            "notes": "Weitere Anmerkungen (auf Italienisch)"
-        }}
-        """
+            Gib die Antwort im folgenden JSON-Format:
+            {{
+                "sentence": "Der Beispielsatz mit der fett markierten Vokabel (in ** doppelten Sternchen **)",
+                "translation": "Deutsche Übersetzung der Vokabel",
+                "meaning": "Bedeutung auf Italienisch (kurze Erklärung)",
+                "etymology": "Etymologie des Wortes (auf Italienisch, kurz)",
+                "inflection": "Flexionen (z.B. Konjugation oder Deklination, auf Italienisch)",
+                "notes": "Weitere Anmerkungen (auf Italienisch)"
+            }}
+            """
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "Du bist ein hilfreicher Assistent für Italienisch-Lernende. Antworte immer im gültigen JSON-Format."},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.7,
-        max_tokens=500
-    )
-
-    # JSON aus der Antwort extrahieren
-    import re
-    content = response.choices[0].message.content
-    json_match = re.search(r'\{.*\}', content, re.DOTALL)
-    if json_match:
-        return json.loads(json_match.group())
-    else:
-        raise ValueError("Kein gültiges JSON in der Antwort gefunden")
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": "Du bist ein hilfreicher Assistent für Italienisch-Lernende. Antworte ausschließlich im gültigen JSON-Format ohne Markdown. Verwende keine Auslassungspunkte (...). Jedes Feld muss einen vollständigen Text enthalten."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+        
+        content = response.choices[0].message.content
+        
+        # Versuche JSON zu extrahieren
+        import re
+        json_match = re.search(r'\{.*\}', content, re.DOTALL)
+        if json_match:
+            json_str = json_match.group()
+            # Entferne alle ... (Ellipsis)
+            json_str = re.sub(r'\.\.\.', '', json_str)
+            # Entferne nachfolgende Kommas
+            json_str = re.sub(r',\s*}', '}', json_str)
+            json_str = re.sub(r',\s*\]', ']', json_str)
+            
+            try:
+                return json.loads(json_str)
+            except json.JSONDecodeError:
+                # Fallback: Versuche JSON zu reparieren
+                # Entferne alles außer gültigen JSON-Zeichen
+                json_str = re.sub(r'[^\{\}\[\]\,\"\:\w\s\-\.\*]', '', json_str)
+                return json.loads(json_str)
+        
+        # Fallback: Text-basierte Antwort parsen
+        result = {
+            "sentence": f"**{word}** (Fehler bei der JSON-Generierung)",
+            "translation": "Fehler bei der Übersetzung",
+            "meaning": "Fehler bei der Bedeutung",
+            "etymology": "Fehler bei der Etymologie",
+            "inflection": "Fehler bei den Flexionen",
+            "notes": "Bitte manuell korrigieren"
+        }
+        return result
+        
+    except Exception as e:
+        print(f"Fehler bei Vokabel {word}: {str(e)}")
+        return {
+            "sentence": f"**{word}** (Fehler: {str(e)[:50]})",
+            "translation": "Fehler bei der Übersetzung",
+            "meaning": "Fehler bei der Bedeutung",
+            "etymology": "Fehler bei der Etymologie",
+            "inflection": "Fehler bei den Flexionen",
+            "notes": "Bitte manuell korrigieren"
+        }
 
 def process_cards(words, mode, client, model, temperature, max_tokens, csv_delimiter):
     global current_process
@@ -121,34 +216,31 @@ def process_cards(words, mode, client, model, temperature, max_tokens, csv_delim
 
     for i, word in enumerate(words):
         try:
-            # ... KI-Aufruf mit den Parametern ...
-            response = client.chat.completions.create(
-                model=model,
-                messages=[...],
-                temperature=temperature,
-                max_tokens=max_tokens
-            )
-
+            # Kontext finden (bei Fließtext)
+            context = None
             if mode == "fluent":
-                # Bei Fließtext müssen wir den Satz finden, der das Wort enthält
-                # Einfache Implementierung: Suche den Satz mit dem Wort
                 sentences = source_text.split('.')
-                context = None
                 for sent in sentences:
                     if word in sent:
                         context = sent.strip() + "."
                         break
-                card_data = generate_card_with_ai(word, context)
-            else:
-                card_data = generate_card_with_ai(word)
-
+            
+            # Karte mit KI generieren (die generate_card_with_ai Funktion verwendet intern den Client)
+            card_data = generate_card_with_ai(
+                word,
+                context_sentence=context,
+                client=client,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+            
             # HTML-fetten Text für Anki vorbereiten
-            front = card_data["sentence"].replace("**", "<b>").replace("**", "</b>", 1)
-            # Der zweite ** wird durch </b> ersetzt (Anki unterstützt HTML)
-            # Aber eigentlich ist der doppelte ** für Markdown, wir müssen es anpassen
+            front = card_data["sentence"]
             front = front.replace("**", "<b>", 1)
             front = front.replace("**", "</b>", 1)
-
+            
+            # Rückseite erstellen
             back = f"""
             {card_data["sentence"]}<br><br>
             <b>Übersetzung:</b> {card_data["translation"]}<br>
@@ -157,33 +249,60 @@ def process_cards(words, mode, client, model, temperature, max_tokens, csv_delim
             <b>Flexionen:</b> {card_data["inflection"]}<br>
             <b>Anmerkungen:</b> {card_data["notes"]}
             """
-
-            # CSV-Zeile vorbereiten (Semikolon als Trennzeichen)
-            # Ersetze Semikolons in Texten
-            front_clean = front.replace(";", ",")
-            back_clean = back.replace(";", ",")
-
+            
+            # CSV-Zeile vorbereiten
+            front_clean = front.replace(";", ",").replace('"', "'").replace("\n", " ")
+            back_clean = back.replace(";", ",").replace('"', "'").replace("\n", " ")
+            
             csv_rows.append([front_clean, back_clean])
             current_process["cards"].append({"front": front, "back": back})
-
+            
             # Fortschritt aktualisieren
             current_process["progress"] = int(((i + 1) / len(words)) * 100)
-
+            
         except Exception as e:
-            print(f"Fehler bei Vokabel {word}: {e}")
-            # Fehlerhafte Karte überspringen
-
+            print(f"Fehler bei Vokabel {word}: {str(e)}")
+            # Fallback-Karte
+            fallback_card = {
+                "sentence": f"**{word}** (Fehler: {str(e)[:50]})",
+                "translation": "Fehler bei der Übersetzung",
+                "meaning": "Fehler bei der Bedeutung",
+                "etymology": "Fehler bei der Etymologie",
+                "inflection": "Fehler bei den Flexionen",
+                "notes": "Bitte manuell korrigieren"
+            }
+            
+            front = fallback_card["sentence"]
+            front = front.replace("**", "<b>", 1)
+            front = front.replace("**", "</b>", 1)
+            
+            back = f"""
+            {fallback_card["sentence"]}<br><br>
+            <b>Übersetzung:</b> {fallback_card["translation"]}<br>
+            <b>Bedeutung:</b> {fallback_card["meaning"]}<br>
+            <b>Etymologie:</b> {fallback_card["etymology"]}<br>
+            <b>Flexionen:</b> {fallback_card["inflection"]}<br>
+            <b>Anmerkungen:</b> {fallback_card["notes"]}
+            """
+            
+            front_clean = front.replace(";", ",").replace('"', "'").replace("\n", " ")
+            back_clean = back.replace(";", ",").replace('"', "'").replace("\n", " ")
+            
+            csv_rows.append([front_clean, back_clean])
+            current_process["cards"].append({"front": front, "back": back})
+            current_process["progress"] = int(((i + 1) / len(words)) * 100)
+    
     # CSV-Daten erstellen
     output = io.StringIO()
     writer = csv.writer(output, delimiter=csv_delimiter, quoting=csv.QUOTE_MINIMAL)
     writer.writerow(["Front", "Back"])
     writer.writerows(csv_rows)
-
+    
     current_process["csv_data"] = output.getvalue()
     current_process["card_count"] = len(csv_rows)
     current_process["running"] = False
     current_process["progress"] = 100
-
+    
     # In Datenbank speichern
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
