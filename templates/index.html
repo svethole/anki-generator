@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anki-Kartengenerator für Italienisch</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <!-- Einstellungs-Overlay -->
+    <div id="settings-overlay" class="overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h2>⚙️ Einstellungen</h2>
+                <button class="close-btn" onclick="closeSettings()">✕</button>
+            </div>
+
+            <form id="settings-form">
+                <div class="form-group">
+                    <label for="api-key">OpenAI API-Key <span class="required">*</span></label>
+                    <input type="password" id="api-key" placeholder="sk-..." required>
+                    <small>Dein API-Key wird nur lokal im Browser gespeichert.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="model-name">Modell</label>
+                    <select id="model-name">
+                        <option value="gpt-4o-mini">GPT-4o mini (empfohlen)</option>
+                        <option value="gpt-4o">GPT-4o (bessere Qualität, teurer)</option>
+                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo (günstiger, weniger genau)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="temperature">Kreativität (Temperature)</label>
+                    <input type="range" id="temperature" min="0" max="1" step="0.1" value="0.7">
+                    <div class="range-labels">
+                        <span>Präzise</span>
+                        <span id="temperature-value">0.7</span>
+                        <span>Kreativ</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="max-tokens">Maximale Token pro Anfrage</label>
+                    <input type="number" id="max-tokens" value="500" min="100" max="2000" step="50">
+                    <small>Mehr Token = detailliertere Antworten, aber höhere Kosten.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="csv-delimiter">CSV-Trennzeichen</label>
+                    <select id="csv-delimiter">
+                        <option value=";">Semikolon (;)</option>
+                        <option value=",">Komma (,)</option>
+                        <option value="	">Tabulator</option>
+                    </select>
+                    <small>Anki erwartet standardmäßig Semikolon.</small>
+                </div>
+
+                <div class="form-group checkbox-group">
+                    <label>
+                        <input type="checkbox" id="save-source-text" checked>
+                        Quelltext in Datenbank speichern
+                    </label>
+                </div>
+
+                <div class="form-group checkbox-group">
+                    <label>
+                        <input type="checkbox" id="auto-open-sidebar" checked>
+                        Historie beim Start automatisch öffnen
+                    </label>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="closeSettings()">Abbrechen</button>
+                    <button type="submit" class="btn-primary">💾 Speichern</button>
+                </div>
+            </form>
+
+            <div class="settings-status">
+                <span id="settings-status-text"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hauptcontainer -->
+    <div class="container">
+        <!-- Hauptbereich -->
+        <div class="main-content">
+            <div class="header">
+                <h1>🇮🇹 Anki-Kartengenerator für Italienisch</h1>
+                <button id="settings-btn" class="btn-icon" title="Einstellungen">⚙️</button>
+            </div>
+
+            <div class="api-status" id="api-status">
+                <span class="status-dot status-unknown"></span>
+                <span id="api-status-text">API-Key nicht konfiguriert</span>
+            </div>
+
+            <!-- Eingabebereich -->
+            <div class="input-section">
+                <label for="mode">Modus:</label>
+                <select id="mode">
+                    <option value="fluent">Fließtext (Vokabeln mit *markiert*)</option>
+                    <option value="list">Reine Vokabelliste (eine pro Zeile)</option>
+                </select>
+
+                <textarea id="source-text" rows="10" placeholder="Füge hier deinen Text ein..."></textarea>
+
+                <button id="start-btn">🚀 Karten generieren</button>
+            </div>
+
+            <!-- Fortschrittsbalken -->
+            <div id="progress-container" style="display:none;">
+                <div id="progress-bar" style="width:0%;"></div>
+                <span id="progress-text">0%</span>
+            </div>
+
+            <!-- Ergebnis-Tabelle -->
+            <div id="results-container" style="display:none;">
+                <h2>Vorschau der generierten Karten</h2>
+                <div id="card-count"></div>
+                <div style="overflow-x: auto;">
+                    <table id="results-table">
+                        <thead>
+                            <tr>
+                                <th style="width:45%;">Vorderseite (Italienisch)</th>
+                                <th style="width:55%;">Rückseite (Deutsch + Erklärungen)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-body">
+                        </tbody>
+                    </table>
+                </div>
+                <button id="download-btn" style="display:none;">📥 CSV herunterladen</button>
+            </div>
+        </div>
+
+        <!-- Seitenleiste mit Historie -->
+        <div class="sidebar" id="sidebar">
+            <button id="toggle-sidebar" class="btn-sidebar">📚 Historie</button>
+            <div id="sidebar-content" style="display:none;">
+                <h3>Verlauf</h3>
+                <div id="history-empty" style="display:none; color: #95a5a6; padding: 20px 0;">
+                    Noch keine Einträge vorhanden.
+                </div>
+                <ul id="history-list"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
