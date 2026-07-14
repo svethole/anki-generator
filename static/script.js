@@ -230,8 +230,8 @@ document.addEventListener('DOMContentLoaded', function() {
         cards.forEach((card) => {
             const row = document.createElement('tr');
             row.innerHTML = `
-            <td>${card.front}</td>
-            <td>${card.back}</td>
+                <td>${card.front}</td>
+                <td>${card.back}</td>
             `;
             resultsBody.appendChild(row);
         });

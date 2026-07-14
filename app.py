@@ -225,7 +225,7 @@ def process_cards(words, mode, client, model, temperature, max_tokens, csv_delim
                         context = sent.strip() + "."
                         break
             
-            # Karte mit KI generieren (die generate_card_with_ai Funktion verwendet intern den Client)
+            # Karte mit KI generieren
             card_data = generate_card_with_ai(
                 word,
                 context_sentence=context,
@@ -235,27 +235,45 @@ def process_cards(words, mode, client, model, temperature, max_tokens, csv_delim
                 max_tokens=max_tokens
             )
             
-            # HTML-fetten Text für Anki vorbereiten
-            front = card_data["sentence"]
-            front = front.replace("**", "<b>", 1)
-            front = front.replace("**", "</b>", 1)
+            # Felder für CSV vorbereiten
+            # 1. Wort: das markierte Wort (fett für Anki)
+            word_field = f"<b>{word}</b>"
             
-            # Rückseite erstellen
-            back = f"""
-            {card_data["sentence"]}<br><br>
-            <b>Übersetzung:</b> {card_data["translation"]}<br>
-            <b>Bedeutung:</b> {card_data["meaning"]}<br>
+            # 2. Beispielsatz: der Satz mit fett markiertem Wort
+            example_sentence = card_data["sentence"]
+            # Ersetze ** durch <b> für Anki
+            example_sentence = example_sentence.replace("**", "<b>", 1)
+            example_sentence = example_sentence.replace("**", "</b>", 1)
+            
+            # 3. Übersetzung: die deutsche Übersetzung
+            translation = card_data["translation"]
+            
+            # 4. Infos: alle weiteren Informationen
+            infos = f"""
+            <b>Bedeutung (Italienisch):</b> {card_data["meaning"]}<br>
             <b>Etymologie:</b> {card_data["etymology"]}<br>
             <b>Flexionen:</b> {card_data["inflection"]}<br>
             <b>Anmerkungen:</b> {card_data["notes"]}
             """
             
-            # CSV-Zeile vorbereiten
-            front_clean = front.replace(";", ",").replace('"', "'").replace("\n", " ")
-            back_clean = back.replace(";", ",").replace('"', "'").replace("\n", " ")
+            # CSV-Zeile vorbereiten (alle Felder bereinigen)
+            word_clean = word_field.replace(";", ",").replace('"', "'").replace("\n", " ")
+            example_clean = example_sentence.replace(";", ",").replace('"', "'").replace("\n", " ")
+            translation_clean = translation.replace(";", ",").replace('"', "'").replace("\n", " ")
+            infos_clean = infos.replace(";", ",").replace('"', "'").replace("\n", " ")
             
-            csv_rows.append([front_clean, back_clean])
-            current_process["cards"].append({"front": front, "back": back})
+            csv_rows.append([word_clean, example_clean, translation_clean, infos_clean])
+            
+            # Für die Live-Vorschau im Frontend
+            current_process["cards"].append({
+                "front": example_sentence,  # Vorderseite: Beispielsatz
+                "back": f"""
+                <b>Wort:</b> {word_field}<br>
+                <b>Beispielsatz:</b> {example_sentence}<br>
+                <b>Übersetzung:</b> {translation}<br>
+                <b>Infos:</b> {infos}
+                """
+            })
             
             # Fortschritt aktualisieren
             current_process["progress"] = int(((i + 1) / len(words)) * 100)
@@ -263,39 +281,39 @@ def process_cards(words, mode, client, model, temperature, max_tokens, csv_delim
         except Exception as e:
             print(f"Fehler bei Vokabel {word}: {str(e)}")
             # Fallback-Karte
-            fallback_card = {
-                "sentence": f"**{word}** (Fehler: {str(e)[:50]})",
-                "translation": "Fehler bei der Übersetzung",
-                "meaning": "Fehler bei der Bedeutung",
-                "etymology": "Fehler bei der Etymologie",
-                "inflection": "Fehler bei den Flexionen",
-                "notes": "Bitte manuell korrigieren"
-            }
-            
-            front = fallback_card["sentence"]
-            front = front.replace("**", "<b>", 1)
-            front = front.replace("**", "</b>", 1)
-            
-            back = f"""
-            {fallback_card["sentence"]}<br><br>
-            <b>Übersetzung:</b> {fallback_card["translation"]}<br>
-            <b>Bedeutung:</b> {fallback_card["meaning"]}<br>
-            <b>Etymologie:</b> {fallback_card["etymology"]}<br>
-            <b>Flexionen:</b> {fallback_card["inflection"]}<br>
-            <b>Anmerkungen:</b> {fallback_card["notes"]}
+            fallback_word = f"<b>{word}</b>"
+            fallback_sentence = f"<b>{word}</b> (Fehler bei der Generierung: {str(e)[:50]})"
+            fallback_translation = "Fehler bei der Übersetzung"
+            fallback_infos = f"""
+            <b>Bedeutung (Italienisch):</b> Fehler bei der Bedeutung<br>
+            <b>Etymologie:</b> Fehler bei der Etymologie<br>
+            <b>Flexionen:</b> Fehler bei den Flexionen<br>
+            <b>Anmerkungen:</b> Bitte manuell korrigieren
             """
             
-            front_clean = front.replace(";", ",").replace('"', "'").replace("\n", " ")
-            back_clean = back.replace(";", ",").replace('"', "'").replace("\n", " ")
+            word_clean = fallback_word.replace(";", ",").replace('"', "'").replace("\n", " ")
+            example_clean = fallback_sentence.replace(";", ",").replace('"', "'").replace("\n", " ")
+            translation_clean = fallback_translation.replace(";", ",").replace('"', "'").replace("\n", " ")
+            infos_clean = fallback_infos.replace(";", ",").replace('"', "'").replace("\n", " ")
             
-            csv_rows.append([front_clean, back_clean])
-            current_process["cards"].append({"front": front, "back": back})
+            csv_rows.append([word_clean, example_clean, translation_clean, infos_clean])
+            
+            current_process["cards"].append({
+                "front": fallback_sentence,
+                "back": f"""
+                <b>Wort:</b> {fallback_word}<br>
+                <b>Beispielsatz:</b> {fallback_sentence}<br>
+                <b>Übersetzung:</b> {fallback_translation}<br>
+                <b>Infos:</b> {fallback_infos}
+                """
+            })
             current_process["progress"] = int(((i + 1) / len(words)) * 100)
     
-    # CSV-Daten erstellen
+    # CSV-Daten erstellen mit den neuen Feldern
     output = io.StringIO()
     writer = csv.writer(output, delimiter=csv_delimiter, quoting=csv.QUOTE_MINIMAL)
-    writer.writerow(["Front", "Back"])
+    # Neue Kopfzeile
+    writer.writerow(["Wort", "Beispielsatz", "Übersetzung", "Infos"])
     writer.writerows(csv_rows)
     
     current_process["csv_data"] = output.getvalue()
