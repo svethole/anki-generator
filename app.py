@@ -6,16 +6,17 @@ import time
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, send_file, Response, stream_with_context
 from flask_cors import CORS
-from openai import OpenAI
 import io
 import csv
 import re
 
+from dotenv import load_dotenv
+load_dotenv()
+
+from openai import OpenAI
+
 app = Flask(__name__)
 CORS(app)
-
-# OpenAI-Client initialisieren (API-Key muss in Umgebungsvariable oder .env)
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Datenbank initialisieren
 DB_PATH = "anki_history.db"
