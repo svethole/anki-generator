@@ -119,6 +119,106 @@ textarea {
     font-family: 'Courier New', monospace;
 }
 
+/* ==================== TEXTAREA MIT TOOLTIP ==================== */
+.textarea-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.textarea-wrapper textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #dce1e8;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: 'Courier New', monospace;
+    resize: vertical;
+    min-height: 200px;
+    line-height: 1.8;
+}
+
+.textarea-wrapper textarea::selection {
+    background: #b3d4fc;
+}
+
+/* ==================== TOOLTIP ==================== */
+.selection-tooltip {
+    position: fixed;
+    background: #2c3e50;
+    color: white;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    z-index: 1000;
+    pointer-events: auto;
+    animation: tooltipFadeIn 0.15s ease;
+    white-space: nowrap;
+    transform: translateX(-50%);
+}
+
+@keyframes tooltipFadeIn {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) scale(1);
+    }
+}
+
+.selection-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: #2c3e50;
+}
+
+.tooltip-btn {
+    background: #3498db;
+    color: white;
+    border: none;
+    padding: 6px 16px;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.2s;
+    margin: 0;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tooltip-btn:hover {
+    background: #2980b9;
+}
+
+.tooltip-btn:active {
+    transform: scale(0.95);
+}
+
+/* Wenn der Tooltip außerhalb des sichtbaren Bereichs ist */
+.selection-tooltip.above::after {
+    top: auto;
+    bottom: 100%;
+    border-top-color: transparent;
+    border-bottom-color: #2c3e50;
+}
+
+/* ==================== MARKIERUNG IM TEXT ==================== */
+/* Hervorhebung von markierten Wörtern */
+#source-text .highlighted {
+    background: #fff3cd;
+    border-radius: 2px;
+    padding: 0 2px;
+}
+
 button {
     background: #3498db;
     color: white;
@@ -433,6 +533,65 @@ background: #f8f9fa;
     gap: 10px;
     margin-top: 25px;
     justify-content: flex-end;
+}
+
+/* === Button-Gruppe === */
+.button-group {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    flex-wrap: wrap;
+}
+
+.button-group button {
+    flex: 1;
+    min-width: 150px;
+}
+
+/* === Reset-Button === */
+.btn-reset {
+    background: #27ae60;
+}
+
+.btn-reset:hover:not(:disabled) {
+    background: #229954;
+}
+
+/* === Eingabebereich zurücksetzen (nach Erfolg) === */
+.input-section.success {
+    border-left: 4px solid #27ae60;
+    padding-left: 15px;
+    transition: border-color 0.3s;
+}
+
+/* === Status-Meldung === */
+#status-message {
+    padding: 10px 15px;
+    border-radius: 6px;
+    margin: 10px 0;
+    display: none;
+    font-weight: 500;
+}
+
+#status-message.success {
+    display: block;
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+#status-message.error {
+    display: block;
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+#status-message.info {
+    display: block;
+    background: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
 }
 
 .btn-primary {

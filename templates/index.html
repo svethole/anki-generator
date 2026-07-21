@@ -105,7 +105,16 @@
                     <option value="list">Reine Vokabelliste (eine pro Zeile)</option>
                 </select>
 
-                <textarea id="source-text" rows="10" placeholder="Füge hier deinen Text ein..."></textarea>
+                    <div class="textarea-wrapper">
+                        <textarea id="source-text" rows="10" placeholder="Füge hier deinen Text ein... Doppelklick auf ein Wort oder Text markieren und auf 'Als Vokabel markieren' klicken."></textarea>
+
+                        <!-- Tooltip für markierten Text -->
+                        <div id="selection-tooltip" class="selection-tooltip" style="display:none;">
+                            <button id="mark-selection-btn" class="tooltip-btn">
+                                ✏️ Als Vokabel markieren
+                            </button>
+                        </div>
+                    </div>
 
                 <button id="start-btn">🚀 Karten generieren</button>
             </div>
@@ -120,6 +129,10 @@
             <div id="results-container" style="display:none;">
                 <h2>Vorschau der generierten Karten</h2>
                 <div id="card-count"></div>
+                <div class="button-group">
+                    <button id="download-btn" style="display:none;">📥 CSV herunterladen</button>
+                    <button id="reset-btn" class="btn-reset" style="display:none;">🔄 Neu</button>
+                </div>
                 <div style="overflow-x: auto;">
                     <table id="results-table">
                         <thead>
@@ -132,7 +145,6 @@
                         </tbody>
                     </table>
                 </div>
-                <button id="download-btn" style="display:none;">📥 CSV herunterladen</button>
             </div>
         </div>
 
